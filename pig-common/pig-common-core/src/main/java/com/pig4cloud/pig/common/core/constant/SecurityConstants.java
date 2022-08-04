@@ -50,7 +50,7 @@ public interface SecurityConstants {
 	/**
 	 * 默认登录URL
 	 */
-	String OAUTH_TOKEN_URL = "/oauth2/token";
+	String OAUTH_TOKEN_URL = "/oauth/login";
 
 	/**
 	 * grant_type
@@ -115,7 +115,7 @@ public interface SecurityConstants {
 	/**
 	 * 短信登录 参数名称
 	 */
-	String SMS_PARAMETER_NAME = "mobile";
+	String SMS_PARAMETER_NAME = "phone";
 
 	/**
 	 * 授权码模式confirm

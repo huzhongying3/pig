@@ -72,7 +72,8 @@ public class PasswordDecoderFilter extends AbstractGatewayFilterFactory {
 		return (exchange, chain) -> {
 			ServerHttpRequest request = exchange.getRequest();
 			// 1. 不是登录请求，直接向下执行
-			if (!StrUtil.containsAnyIgnoreCase(request.getURI().getPath(), SecurityConstants.OAUTH_TOKEN_URL)) {
+			if (!StrUtil.containsAnyIgnoreCase(request.getURI().getPath(), SecurityConstants.OAUTH_TOKEN_URL)&&
+					!StrUtil.containsAnyIgnoreCase(request.getURI().getPath(), "/oauth2/login")) {
 				return chain.filter(exchange);
 			}
 
@@ -88,13 +89,13 @@ public class PasswordDecoderFilter extends AbstractGatewayFilterFactory {
 			ServerRequest serverRequest = ServerRequest.create(exchange, messageReaders);
 
 			// 4. 解密生成新的报文
-			Mono<?> modifiedBody = serverRequest.bodyToMono(inClass).flatMap(decryptAES());
+			Mono<?> modifiedBody = serverRequest.bodyToMono(inClass);
 
 			BodyInserter bodyInserter = BodyInserters.fromPublisher(modifiedBody, outClass);
 			HttpHeaders headers = new HttpHeaders();
 			headers.putAll(exchange.getRequest().getHeaders());
 			headers.remove(HttpHeaders.CONTENT_LENGTH);
-
+			headers.set("DNT","1");
 			headers.set(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED_VALUE);
 			CachedBodyOutputMessage outputMessage = new CachedBodyOutputMessage(exchange, headers);
 			return bodyInserter.insert(outputMessage, new BodyInserterContext()).then(Mono.defer(() -> {
@@ -134,7 +135,7 @@ public class PasswordDecoderFilter extends AbstractGatewayFilterFactory {
 	 * @return
 	 */
 	private ServerHttpRequestDecorator decorate(ServerWebExchange exchange, HttpHeaders headers,
-			CachedBodyOutputMessage outputMessage) {
+												CachedBodyOutputMessage outputMessage) {
 		return new ServerHttpRequestDecorator(exchange.getRequest()) {
 			@Override
 			public HttpHeaders getHeaders() {

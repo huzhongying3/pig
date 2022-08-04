@@ -59,74 +59,10 @@ public class ValidateCodeGatewayFilter extends AbstractGatewayFilterFactory<Obje
 	@Override
 	public GatewayFilter apply(Object config) {
 		return (exchange, chain) -> {
-			ServerHttpRequest request = exchange.getRequest();
-			boolean isAuthToken = CharSequenceUtil.containsAnyIgnoreCase(request.getURI().getPath(),
-					SecurityConstants.OAUTH_TOKEN_URL);
-
-			// 不是登录请求，直接向下执行
-			if (!isAuthToken) {
-				return chain.filter(exchange);
-			}
-
-			// 刷新token，手机号登录（也可以这里进行校验） 直接向下执行
-			String grantType = request.getQueryParams().getFirst("grant_type");
-			if (StrUtil.equals(SecurityConstants.REFRESH_TOKEN, grantType)) {
-				return chain.filter(exchange);
-			}
-
-			boolean isIgnoreClient = configProperties.getIgnoreClients().contains(WebUtils.getClientId(request));
-			try {
-				// only oauth and the request not in ignore clients need check code.
-				if (!isIgnoreClient) {
-					checkCode(request);
-				}
-			}
-			catch (Exception e) {
-				ServerHttpResponse response = exchange.getResponse();
-				response.setStatusCode(HttpStatus.PRECONDITION_REQUIRED);
-				response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
-
-				final String errMsg = e.getMessage();
-				return response.writeWith(Mono.create(monoSink -> {
-					try {
-						byte[] bytes = objectMapper.writeValueAsBytes(R.failed(errMsg));
-						DataBuffer dataBuffer = response.bufferFactory().wrap(bytes);
-
-						monoSink.success(dataBuffer);
-					}
-					catch (JsonProcessingException jsonProcessingException) {
-						log.error("对象输出异常", jsonProcessingException);
-						monoSink.error(jsonProcessingException);
-					}
-				}));
-			}
-
 			return chain.filter(exchange);
+
 		};
 	}
 
-	@SneakyThrows
-	private void checkCode(ServerHttpRequest request) {
-		String code = request.getQueryParams().getFirst("code");
-
-		if (CharSequenceUtil.isBlank(code)) {
-			throw new ValidateCodeException("验证码不能为空");
-		}
-
-		String randomStr = request.getQueryParams().getFirst("randomStr");
-		if (CharSequenceUtil.isBlank(randomStr)) {
-			randomStr = request.getQueryParams().getFirst("mobile");
-		}
-
-		String key = CacheConstants.DEFAULT_CODE_KEY + randomStr;
-
-		Object codeObj = redisTemplate.opsForValue().get(key);
-
-		redisTemplate.delete(key);
-
-		if (ObjectUtil.isEmpty(codeObj) || !code.equals(codeObj)) {
-			throw new ValidateCodeException("验证码不合法");
-		}
-	}
 
 }
